@@ -191,13 +191,6 @@ Further reading: [Stack Overflow](https://stackoverflow.com/questions/36725181/n
 
 When installing for the first time, you can get warnings that need to be resolved:
 
-```
-npm WARN eslint-config-scratch@5.0.0 requires a peer of babel-eslint@^8.0.1 but none was installed.
-npm WARN eslint-config-scratch@5.0.0 requires a peer of eslint@^4.0 but none was installed.
-npm WARN scratch-paint@0.2.0-prerelease.20190318170811 requires a peer of react-intl-redux@^0.7 but none was installed.
-npm WARN scratch-paint@0.2.0-prerelease.20190318170811 requires a peer of react-responsive@^4 but none was installed.
-```
-
 You can check which versions are available:
 
 ```

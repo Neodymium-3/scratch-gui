@@ -1,10 +1,8 @@
 const defaultsDeep = require('lodash.defaultsdeep');
+const rspack = require('@rspack/core');
 const path = require('path');
-const webpack = require('webpack');
 
-// Plugins
-const CopyWebpackPlugin = require('copy-webpack-plugin');
-const HtmlWebpackPlugin = require('html-webpack-plugin');
+const HtmlRspackPlugin = require('html-rspack-plugin');
 
 // PostCss
 const autoprefixer = require('autoprefixer');
@@ -19,10 +17,11 @@ if (root.length > 0 && !root.endsWith('/')) {
     throw new Error('If ROOT is defined, it must have a trailing slash.');
 }
 
-const htmlWebpackPluginCommon = {
+const htmlRspackPluginCommon = {
     root: root,
     meta: JSON.parse(process.env.EXTRA_META || '{}'),
-    APP_NAME
+    APP_NAME,
+    isEditor: false
 };
 
 // When this changes, the path for all JS files will change, bypassing any HTTP caches
@@ -66,9 +65,10 @@ const base = {
         }
     },
     module: {
-        rules: [{
+        rules: [
+        {
             test: /\.jsx?$/,
-            loader: 'babel-loader',
+            loader: 'builtin:swc-loader',
             include: [
                 path.resolve(__dirname, 'src'),
                 /node_modules[\\/]scratch-[^\\/]+[\\/]src/,
@@ -76,14 +76,13 @@ const base = {
                 /node_modules[\\/]@vernier[\\/]godirect/
             ],
             options: {
-                // Explicitly disable babelrc so we don't catch various config
-                // in much lower dependencies.
-                babelrc: false,
-                plugins: [
-                    ['react-intl', {
-                        messagesDir: './translations/messages/'
-                    }]],
-                presets: ['@babel/preset-env', '@babel/preset-react']
+                jsc: {
+                    parser: {
+                        syntax: 'ecmascript',
+                        jsx: true,
+                        dynamicImport: true
+                    }
+                }
             }
         },
         {
@@ -114,14 +113,17 @@ const base = {
         }]
     },
     plugins: [
-        new CopyWebpackPlugin({
+        new rspack.ProvidePlugin({
+            Buffer: ['buffer', 'Buffer']
+        }),
+        new rspack.CopyRspackPlugin({
             patterns: [
                 {
-                    from: 'node_modules/scratch-blocks/media',
+                    from: '../node_modules/scratch-blocks/media',
                     to: 'static/blocks-media/default'
                 },
                 {
-                    from: 'node_modules/scratch-blocks/media',
+                    from: '../node_modules/scratch-blocks/media',
                     to: 'static/blocks-media/high-contrast'
                 },
                 {
@@ -135,7 +137,7 @@ const base = {
 };
 
 if (!process.env.CI) {
-    base.plugins.push(new webpack.ProgressPlugin());
+    base.plugins.push(new rspack.ProgressPlugin());
 }
 
 module.exports = [
@@ -165,6 +167,12 @@ module.exports = [
                 }
             ])
         },
+        watchOptions: {
+            ignored: [
+                '**/node_modules/!(scratch-vm|scratch-render)/**',
+                'C:/**'
+            ]
+        },
         optimization: {
             splitChunks: {
                 chunks: 'all',
@@ -174,7 +182,7 @@ module.exports = [
             }
         },
         plugins: base.plugins.concat([
-            new webpack.DefinePlugin({
+            new rspack.DefinePlugin({
                 'process.env.NODE_ENV': `"${process.env.NODE_ENV}"`,
                 'process.env.DEBUG': Boolean(process.env.DEBUG),
                 'process.env.ENABLE_SERVICE_WORKER': JSON.stringify(process.env.ENABLE_SERVICE_WORKER || ''),
@@ -182,50 +190,68 @@ module.exports = [
                 'process.env.ROUTING_STYLE': JSON.stringify(process.env.ROUTING_STYLE || 'filehash'),
                 'process.env.ENABLE_WINDCHIMES': JSON.stringify(process.env.ENABLE_WINDCHIMES || '')
             }),
-            new HtmlWebpackPlugin({
+            new HtmlRspackPlugin({
                 chunks: ['editor'],
                 template: 'src/playground/index.ejs',
                 filename: 'editor.html',
-                title: `${APP_NAME} - Run Scratch projects faster`,
-                isEditor: true,
-                ...htmlWebpackPluginCommon
+                inject: true,
+                templateParameters: {
+                    ...htmlRspackPluginCommon,
+                    title: `${APP_NAME} - Run Scratch projects faster`,
+                    isEditor: true
+                }
             }),
-            new HtmlWebpackPlugin({
+            new HtmlRspackPlugin({
                 chunks: ['player'],
                 template: 'src/playground/index.ejs',
                 filename: 'index.html',
-                title: `${APP_NAME} - Run Scratch projects faster`,
-                ...htmlWebpackPluginCommon
+                inject: true,
+                templateParameters: {
+                    ...htmlRspackPluginCommon,
+                    title: `${APP_NAME} - Run Scratch projects faster`
+                }
             }),
-            new HtmlWebpackPlugin({
+            new HtmlRspackPlugin({
                 chunks: ['fullscreen'],
                 template: 'src/playground/index.ejs',
                 filename: 'fullscreen.html',
-                title: `${APP_NAME} - Run Scratch projects faster`,
-                ...htmlWebpackPluginCommon
+                inject: true,
+                templateParameters: {
+                    ...htmlRspackPluginCommon,
+                    title: `${APP_NAME} - Run Scratch projects faster`
+                }
             }),
-            new HtmlWebpackPlugin({
+            new HtmlRspackPlugin({
                 chunks: ['embed'],
                 template: 'src/playground/embed.ejs',
                 filename: 'embed.html',
-                title: `Embedded Project - ${APP_NAME}`,
-                ...htmlWebpackPluginCommon
+                inject: true,
+                templateParameters: {
+                    ...htmlRspackPluginCommon,
+                    title: `Embedded Project - ${APP_NAME}`
+                }
             }),
-            new HtmlWebpackPlugin({
+            new HtmlRspackPlugin({
                 chunks: ['addon-settings'],
                 template: 'src/playground/simple.ejs',
                 filename: 'addons.html',
-                title: `Addon Settings - ${APP_NAME}`,
-                ...htmlWebpackPluginCommon
+                inject: true,
+                templateParameters: {
+                    ...htmlRspackPluginCommon,
+                    title: `Addon Settings - ${APP_NAME}`
+                }
             }),
-            new HtmlWebpackPlugin({
+            new HtmlRspackPlugin({
                 chunks: ['credits'],
                 template: 'src/playground/simple.ejs',
+                inject: true,
                 filename: 'credits.html',
-                title: `${APP_NAME} Credits`,
-                ...htmlWebpackPluginCommon
+                templateParameters: {
+                    ...htmlRspackPluginCommon,
+                    title: `${APP_NAME} Credits`
+                }
             }),
-            new CopyWebpackPlugin({
+            new rspack.CopyRspackPlugin({
                 patterns: [
                     {
                         from: 'static',
@@ -233,7 +259,7 @@ module.exports = [
                     }
                 ]
             }),
-            new CopyWebpackPlugin({
+            new rspack.CopyRspackPlugin({
                 patterns: [
                     {
                         from: 'extensions/**',
@@ -278,7 +304,7 @@ module.exports = [
                 ])
             },
             plugins: base.plugins.concat([
-                new CopyWebpackPlugin({
+                new rspack.CopyRspackPlugin({
                     patterns: [
                         {
                             from: 'extension-worker.{js,js.map}',
@@ -288,7 +314,7 @@ module.exports = [
                     ]
                 }),
                 // Include library JSON files for scratch-desktop to use for downloading
-                new CopyWebpackPlugin({
+                new rspack.CopyRspackPlugin({
                     patterns: [
                         {
                             from: 'src/lib/libraries/*.json',
